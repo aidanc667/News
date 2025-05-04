@@ -6,19 +6,17 @@ import os
 from collections import defaultdict
 import time
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-from pathlib import Path
 
-# Configuration must be first
+# Configuration
 st.set_page_config(layout="wide", page_title="News Bias Analyzer")
 
 # Initialize Gemini
-GEMINI_API_KEY = "your-gemini-api-key"
+GEMINI_API_KEY = "AIzaSyAMXBR4JBXw0Y3d5sxfUwQgHJCI8VqddlM"
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Initialize NewsAPI
-NEWS_API_KEY = "your-news-api-key"
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "71c14398131a486d8135d30e80e45dd4")
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 
 # News sources mapping
@@ -138,7 +136,7 @@ def get_recent_articles(source):
         'sortBy': 'popularity',
         'language': 'en',
         'apiKey': NEWS_API_KEY,
-        'pageSize': 5,  # Explicitly set to 5 articles
+        'pageSize': 5,
         'q': 'politics OR election OR congress OR senate OR president OR government OR policy OR legislation OR bill OR law'
     }
     
@@ -150,7 +148,7 @@ def get_recent_articles(source):
             st.error(f"No trending articles found from {source} in the last 24 hours")
             return []
             
-        return articles_data['articles'][:5]  # Ensure we only return 5 articles
+        return articles_data['articles']
     except Exception as e:
         st.error(f"Error fetching articles: {str(e)}")
         return []
