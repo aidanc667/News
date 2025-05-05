@@ -11,12 +11,12 @@ from bs4 import BeautifulSoup
 st.set_page_config(layout="wide", page_title="News Bias Analyzer")
 
 # Initialize Gemini
-GEMINI_API_KEY = "AIzaSyAMXBR4JBXw0Y3d5sxfUwQgHJCI8VqddlM"
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Initialize NewsAPI
-NEWS_API_KEY = os.getenv("NEWS_API_KEY", "71c14398131a486d8135d30e80e45dd4")
+NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 
 # News sources mapping
