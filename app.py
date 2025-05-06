@@ -29,7 +29,7 @@ try:
         st.stop()
     else:
         st.success("Successfully loaded NEWS_API_KEY")
-    NEWS_API_URL = "https://newsapi.org/v2/everything"
+    NEWS_API_URL = "https://newsapi.org/v2/everything"  # Back to everything endpoint
 except KeyError as e:
     st.error(f"Missing API key in secrets.toml: {str(e)}")
     st.stop()
@@ -37,11 +37,11 @@ except Exception as e:
     st.error(f"Error accessing secrets: {str(e)}")
     st.stop()
 
-# News sources mapping
+# News sources mapping with domains
 NEWS_SOURCES = {
-    "CNN": "cnn",
-    "Fox News": "fox-news",
-    "MSNBC": "msnbc"
+    "CNN": "cnn.com",
+    "Fox News": "foxnews.com",
+    "MSNBC": "msnbc.com"
 }
 
 # Custom CSS
@@ -147,23 +147,38 @@ def get_recent_articles(source):
     today = datetime.now()
     one_day_ago = today - timedelta(days=1)
     
+    # Validate source
+    if source not in NEWS_SOURCES:
+        st.error(f"Invalid news source: {source}")
+        return []
+    
+    source_domain = NEWS_SOURCES[source]
+    
     params = {
-        'sources': source,
+        'domains': source_domain,  # Use domains instead of sources
         'from': one_day_ago.strftime('%Y-%m-%dT%H:%M:%S'),
         'to': today.strftime('%Y-%m-%dT%H:%M:%S'),
-        'sortBy': 'popularity',
         'language': 'en',
         'apiKey': NEWS_API_KEY,
         'pageSize': 5,
-        'q': 'politics OR election OR congress OR senate OR president OR government OR policy OR legislation OR bill OR law'
+        'sortBy': 'publishedAt',
+        'q': '(US OR American) AND (politics OR government OR Congress OR Senate OR White House OR Biden OR Trump OR election)'
     }
     
     try:
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
         articles_data = response.json()
         
+        if response.status_code != 200:
+            st.error(f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}")
+            return []
+            
         if not articles_data.get('articles'):
             st.error(f"No trending articles found from {source} in the last 24 hours")
+            if 'status' in articles_data:
+                st.error(f"API Status: {articles_data['status']}")
+            if 'message' in articles_data:
+                st.error(f"API Message: {articles_data['message']}")
             return []
             
         return articles_data['articles']
@@ -279,7 +294,7 @@ selected_source = st.selectbox(
 
 if selected_source:
     with st.spinner(f"Loading trending articles from {selected_source}..."):
-        articles = get_recent_articles(NEWS_SOURCES[selected_source])
+        articles = get_recent_articles(selected_source)
         
         if not articles:
             st.error(f"Could not fetch trending articles from {selected_source}. Please try again later.")
