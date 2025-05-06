@@ -10,14 +10,32 @@ from bs4 import BeautifulSoup
 # Configuration
 st.set_page_config(layout="wide", page_title="News Bias Analyzer")
 
-# Initialize Gemini
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Debug secrets access
+try:
+    # Initialize Gemini
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    if not GEMINI_API_KEY:
+        st.error("GEMINI_API_KEY is empty in secrets.toml")
+        st.stop()
+    else:
+        st.success("Successfully loaded GEMINI_API_KEY")
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Initialize NewsAPI
-NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
-NEWS_API_URL = "https://newsapi.org/v2/everything"
+    # Initialize NewsAPI
+    NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
+    if not NEWS_API_KEY:
+        st.error("NEWS_API_KEY is empty in secrets.toml")
+        st.stop()
+    else:
+        st.success("Successfully loaded NEWS_API_KEY")
+    NEWS_API_URL = "https://newsapi.org/v2/everything"
+except KeyError as e:
+    st.error(f"Missing API key in secrets.toml: {str(e)}")
+    st.stop()
+except Exception as e:
+    st.error(f"Error accessing secrets: {str(e)}")
+    st.stop()
 
 # News sources mapping
 NEWS_SOURCES = {
