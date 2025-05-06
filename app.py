@@ -29,7 +29,15 @@ try:
         st.stop()
     else:
         st.success("Successfully loaded NEWS_API_KEY")
-    NEWS_API_URL = "https://newsapi.org/v2/everything"  # Back to everything endpoint
+        # Test the NewsAPI key
+        test_url = "https://newsapi.org/v2/top-headlines?country=us&apiKey=" + NEWS_API_KEY
+        test_response = requests.get(test_url, timeout=10)
+        if test_response.status_code == 200:
+            st.success("NewsAPI key is valid and working")
+        else:
+            st.error(f"NewsAPI key test failed with status code: {test_response.status_code}")
+            st.error(f"Error message: {test_response.json().get('message', 'No error message')}")
+    NEWS_API_URL = "https://newsapi.org/v2/everything"
 except KeyError as e:
     st.error(f"Missing API key in secrets.toml: {str(e)}")
     st.stop()
@@ -155,7 +163,7 @@ def get_recent_articles(source):
     source_domain = NEWS_SOURCES[source]
     
     params = {
-        'domains': source_domain,  # Use domains instead of sources
+        'domains': source_domain,
         'from': one_day_ago.strftime('%Y-%m-%dT%H:%M:%S'),
         'to': today.strftime('%Y-%m-%dT%H:%M:%S'),
         'language': 'en',
@@ -166,11 +174,21 @@ def get_recent_articles(source):
     }
     
     try:
+        # Debug: Print the request URL (without the API key)
+        debug_params = params.copy()
+        debug_params['apiKey'] = '***'
+        st.write("Debug - Request parameters:", debug_params)
+        
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
         articles_data = response.json()
         
+        # Debug: Print the response status
+        st.write("Debug - Response status:", response.status_code)
+        
         if response.status_code != 200:
             st.error(f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}")
+            if 'code' in articles_data:
+                st.error(f"Error Code: {articles_data['code']}")
             return []
             
         if not articles_data.get('articles'):
