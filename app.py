@@ -29,7 +29,7 @@ try:
         st.stop()
     else:
         st.success("Successfully loaded NEWS_API_KEY")
-    NEWS_API_URL = "https://newsapi.org/v2/everything"  # Back to everything endpoint
+    NEWS_API_URL = "https://newsapi.org/v2/everything"
 except KeyError as e:
     st.error(f"Missing API key in secrets.toml: {str(e)}")
     st.stop()
@@ -154,34 +154,71 @@ def get_recent_articles(source):
     
     source_domain = NEWS_SOURCES[source]
     
+    # First try with domain
     params = {
-        'domains': source_domain,  # Use domains instead of sources
-        'from': one_day_ago.strftime('%Y-%m-%dT%H:%M:%S'),
-        'to': today.strftime('%Y-%m-%dT%H:%M:%S'),
+        'domains': source_domain,
         'language': 'en',
         'apiKey': NEWS_API_KEY,
-        'pageSize': 5,
-        'sortBy': 'publishedAt',
-        'q': '(US OR American) AND (politics OR government OR Congress OR Senate OR White House OR Biden OR Trump OR election)'
+        'pageSize': 10,  # Increased to get more articles
+        'sortBy': 'publishedAt'
     }
     
     try:
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
         articles_data = response.json()
         
+        # If no articles found, try with a broader search
+        if not articles_data.get('articles'):
+            params = {
+                'q': f'site:{source_domain}',
+                'language': 'en',
+                'apiKey': NEWS_API_KEY,
+                'pageSize': 10,  # Increased to get more articles
+                'sortBy': 'publishedAt'
+            }
+            response = requests.get(NEWS_API_URL, params=params, timeout=10)
+            articles_data = response.json()
+        
         if response.status_code != 200:
             st.error(f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}")
+            if 'code' in articles_data:
+                st.error(f"Error Code: {articles_data['code']}")
             return []
             
         if not articles_data.get('articles'):
-            st.error(f"No trending articles found from {source} in the last 24 hours")
+            st.error(f"No articles found from {source}")
             if 'status' in articles_data:
                 st.error(f"API Status: {articles_data['status']}")
             if 'message' in articles_data:
                 st.error(f"API Message: {articles_data['message']}")
             return []
             
-        return articles_data['articles']
+        # Filter articles to only include political content
+        political_articles = []
+        political_keywords = ['politics', 'government', 'congress', 'senate', 'white house', 'biden', 'trump', 'election', 'democrat', 'republican', 'campaign', 'vote', 'legislation', 'policy']
+        
+        # Try to get 5 political articles
+        for article in articles_data['articles']:
+            title = article.get('title', '').lower()
+            description = article.get('description', '').lower()
+            if any(keyword in title or keyword in description for keyword in political_keywords):
+                political_articles.append(article)
+                if len(political_articles) >= 5:
+                    break
+        
+        # If we don't have 5 political articles, add non-political articles to reach 5
+        if len(political_articles) < 5:
+            for article in articles_data['articles']:
+                if article not in political_articles:
+                    political_articles.append(article)
+                    if len(political_articles) >= 5:
+                        break
+        
+        if not political_articles:
+            st.error(f"No articles found from {source}")
+            return []
+            
+        return political_articles[:5]  # Ensure we return exactly 5 articles
     except Exception as e:
         st.error(f"Error fetching articles: {str(e)}")
         return []
