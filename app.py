@@ -10,31 +10,14 @@ from bs4 import BeautifulSoup
 # Configuration
 st.set_page_config(layout="wide", page_title="News Bias Analyzer")
 
-# Debug secrets access
+# Initialize APIs
 try:
-    # Initialize Gemini
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    if not GEMINI_API_KEY:
-        st.error("GEMINI_API_KEY is empty in secrets.toml")
-        st.stop()
-    else:
-        st.success("Successfully loaded GEMINI_API_KEY")
-    genai.configure(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
-
-    # Initialize NewsAPI
     NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
-    if not NEWS_API_KEY:
-        st.error("NEWS_API_KEY is empty in secrets.toml")
-        st.stop()
-    else:
-        st.success("Successfully loaded NEWS_API_KEY")
     NEWS_API_URL = "https://newsapi.org/v2/everything"
-except KeyError as e:
-    st.error(f"Missing API key in secrets.toml: {str(e)}")
-    st.stop()
 except Exception as e:
-    st.error(f"Error accessing secrets: {str(e)}")
+    st.error("Error initializing APIs. Please check your API keys.")
     st.stop()
 
 # News sources mapping with domains
@@ -249,17 +232,17 @@ def fetch_full_article(url):
 def generate_article_summary(article_content):
     """Generate a concise summary of the article using Gemini"""
     prompt = f"""
-    Provide a clear and concise summary of this article. Include:
-    1. Main topic and context
-    2. Key facts and figures
-    3. Main arguments and positions
-    4. Important quotes or statements
-    5. Potential implications
+    Summarize this article in 4-5 bullet points:
+    1. Main topic
+    2. Key facts
+    3. Main arguments
+    4. Key quotes
+    5. Impact
     
     Article content:
     {article_content[:8000]}
     
-    Return 4-5 bullet points, each 12-20 words long, focusing on the most important aspects.
+    Keep each point under 10 words. Be direct and clear.
     """
     
     try:
@@ -272,16 +255,16 @@ def analyze_bias(article_content, source):
     """Analyze the political bias in the article"""
     prompt = f"""
     Analyze bias in this {source} article. For each aspect, provide specific examples:
-    1. Word choice and framing (loaded terms, emotional language)
-    2. Fact selection (what's included/excluded)
-    3. Tone and perspective (how issues are presented)
-    4. Sources used (who is quoted, who isn't)
-    5. Conclusions drawn (what's suggested)
+    1. Word choice (loaded terms)
+    2. Fact selection (inclusions/exclusions)
+    3. Tone (how presented)
+    4. Sources (who's quoted)
+    5. Conclusions (what's implied)
     
     Article content:
     {article_content[:8000]}
     
-    Return 4-5 bullet points, each 10-15 words long, with specific examples from the text.
+    Keep each point under 8 words. Include specific examples.
     """
     
     try:
@@ -293,17 +276,17 @@ def analyze_bias(article_content, source):
 def generate_devils_advocate(article_content, source):
     """Generate a devil's advocate analysis of the article"""
     prompt = f"""
-    Provide a critical analysis of this {source} article. Consider:
-    1. Missing information or context (what's not being said)
-    2. Opposing viewpoints (how others might see this)
-    3. Questionable assumptions (what's being taken for granted)
-    4. Alternative interpretations (other ways to understand the facts)
-    5. Unanswered questions (what remains unclear)
+    Critically analyze this {source} article:
+    1. Missing context
+    2. Opposing views
+    3. Questionable assumptions
+    4. Alternative interpretations
+    5. Unanswered questions
     
     Article content:
     {article_content[:8000]}
     
-    Return 4-5 bullet points, each 12-20 words long, focusing on specific gaps or alternative perspectives.
+    Keep each point under 8 words. Focus on gaps and alternatives.
     """
     
     try:
@@ -339,19 +322,16 @@ if selected_source:
         
         # Display each article with analysis
         for i, article in enumerate(articles):
-            with st.expander(f"### {article['title']}", expanded=False):  # Changed to always be False
-                # Article metadata
+            with st.expander(f"### {article['title']}", expanded=False):
+                # Article metadata - simplified to just the link
                 st.markdown(f"""
                 <div class="article-box">
-                    <div class="article-title">{article['title']}</div>
-                    <div>{article.get('description', 'No description available')}</div>
-                    {f'<div class="article-link">Published: {datetime.strptime(article["publishedAt"], "%Y-%m-%dT%H:%M:%SZ").strftime("%m-%d-%Y %I:%M %p")}</div>' if article.get("publishedAt") else ''}
                     {f'<div class="article-link"><a href="{article["url"]}" target="_blank">Read full article</a></div>' if article.get("url") else ''}
                 </div>
                 """, unsafe_allow_html=True)
                 
                 # Fetch full article content
-                with st.spinner("Fetching and analyzing article content..."):
+                with st.spinner("Analyzing article..."):
                     article_content = fetch_full_article(article['url'])
                     if not article_content:
                         article_content = f"{article['title']}\n{article.get('description', '')}"
