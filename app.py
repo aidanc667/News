@@ -8,7 +8,7 @@ import time
 from bs4 import BeautifulSoup
 
 # Configuration
-st.set_page_config(layout="wide", page_title="News Bias Analyzer")
+st.set_page_config(layout="wide", page_title="News Bias AI")
 
 # Initialize APIs
 try:
@@ -24,7 +24,8 @@ except Exception as e:
 NEWS_SOURCES = {
     "CNN": "cnn.com",
     "Fox News": "foxnews.com",
-    "MSNBC": "msnbc.com"
+    "Politico": "politico.com",
+    "NBC News": "nbcnews.com"
 }
 
 # Custom CSS
@@ -299,8 +300,8 @@ def generate_devils_advocate(article_content, source):
 today = datetime.now().strftime("%A, %B %d, %Y")
 st.markdown(f"""
 <div class="header-banner">
-    <h1>News Bias Analyzer</h1>
-    <p>Analyze Trending Articles with AI-Powered Insights</p>
+    <h1>News Bias AI</h1>
+    <p> In-depth Analysis on Trending Articles</p>
     <div class="date">{today}</div>
 </div>
 """, unsafe_allow_html=True)
