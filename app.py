@@ -8,7 +8,7 @@ import time
 from bs4 import BeautifulSoup
 
 # Configuration
-st.set_page_config(layout="wide", page_title="News Bias AI")
+st.set_page_config(layout="wide", page_title="News Bias ai")
 
 # Initialize APIs
 try:
@@ -300,7 +300,7 @@ def generate_devils_advocate(article_content, source):
 today = datetime.now().strftime("%A, %B %d, %Y")
 st.markdown(f"""
 <div class="header-banner">
-    <h1>News Bias AI</h1>
+    <h1>News Bias ai</h1>
     <p> In-depth Analysis on Trending Articles</p>
     <div class="date">{today}</div>
 </div>
