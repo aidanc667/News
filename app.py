@@ -7,17 +7,31 @@ from collections import defaultdict
 import time
 from bs4 import BeautifulSoup
 
+# Debug: Print environment variables (without exposing actual keys)
+st.write("Checking environment variables...")
+st.write("GEMINI_API_KEY exists:", "GEMINI_API_KEY" in os.environ)
+st.write("NEWS_API_KEY exists:", "NEWS_API_KEY" in os.environ)
+
 # Configuration
-st.set_page_config(layout="wide", page_title="News Bias ai")
+st.set_page_config(layout="wide", page_title="News Bias AI")
 
 # Initialize APIs
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # Try getting API keys from environment variables first
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    news_key = os.environ.get("NEWS_API_KEY")
+    
+    if not gemini_key or not news_key:
+        # Fall back to secrets if environment variables aren't set
+        gemini_key = st.secrets["GEMINI_API_KEY"]
+        news_key = st.secrets["NEWS_API_KEY"]
+    
+    genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
-    NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
+    NEWS_API_KEY = news_key
     NEWS_API_URL = "https://newsapi.org/v2/everything"
 except Exception as e:
-    st.error("Error initializing APIs. Please check your API keys.")
+    st.error(f"Error initializing APIs: {str(e)}")
     st.stop()
 
 # News sources mapping with domains
@@ -300,7 +314,7 @@ def generate_devils_advocate(article_content, source):
 today = datetime.now().strftime("%A, %B %d, %Y")
 st.markdown(f"""
 <div class="header-banner">
-    <h1>News Bias ai</h1>
+    <h1>News Bias AI</h1>
     <p> In-depth Analysis on Trending Articles</p>
     <div class="date">{today}</div>
 </div>
