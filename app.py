@@ -7,13 +7,13 @@ from collections import defaultdict
 import time
 from bs4 import BeautifulSoup
 
+# Configuration
+st.set_page_config(layout="wide", page_title="News Bias AI")
+
 # Debug: Print environment variables (without exposing actual keys)
 st.write("Checking environment variables...")
 st.write("GEMINI_API_KEY exists:", "GEMINI_API_KEY" in os.environ)
 st.write("NEWS_API_KEY exists:", "NEWS_API_KEY" in os.environ)
-
-# Configuration
-st.set_page_config(layout="wide", page_title="News Bias AI")
 
 # Initialize APIs
 try:
