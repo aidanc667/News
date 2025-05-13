@@ -162,33 +162,50 @@ def get_recent_articles(source):
     }
     
     try:
+        # Debug: Print the API request details (without the actual API key)
+        debug_params = params.copy()
+        debug_params['apiKey'] = '***'  # Hide the actual API key
+        st.write("Making API request with parameters:", debug_params)
+        
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
+        
+        # Debug: Print response status and headers
+        st.write("Response status code:", response.status_code)
+        st.write("Response headers:", dict(response.headers))
+        
+        # Try to get the response text for debugging
+        response_text = response.text
+        st.write("Response text preview:", response_text[:200] if response_text else "No response text")
+        
         articles_data = response.json()
         
         # If no articles found, try with a broader search
         if not articles_data.get('articles'):
+            st.write("No articles found with domain search, trying broader search...")
             params = {
                 'q': f'site:{source_domain}',
                 'language': 'en',
                 'apiKey': NEWS_API_KEY,
-                'pageSize': 10,  # Increased to get more articles
+                'pageSize': 10,
                 'sortBy': 'publishedAt'
             }
             response = requests.get(NEWS_API_URL, params=params, timeout=10)
             articles_data = response.json()
         
         if response.status_code != 200:
-            st.error(f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}")
+            error_msg = f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}"
             if 'code' in articles_data:
-                st.error(f"Error Code: {articles_data['code']}")
+                error_msg += f"\nError Code: {articles_data['code']}"
+            st.error(error_msg)
             return []
             
         if not articles_data.get('articles'):
-            st.error(f"No articles found from {source}")
+            error_msg = f"No articles found from {source}"
             if 'status' in articles_data:
-                st.error(f"API Status: {articles_data['status']}")
+                error_msg += f"\nAPI Status: {articles_data['status']}"
             if 'message' in articles_data:
-                st.error(f"API Message: {articles_data['message']}")
+                error_msg += f"\nAPI Message: {articles_data['message']}"
+            st.error(error_msg)
             return []
             
         # Filter articles to only include political content
@@ -217,8 +234,14 @@ def get_recent_articles(source):
             return []
             
         return political_articles[:5]  # Ensure we return exactly 5 articles
+    except requests.exceptions.RequestException as e:
+        st.error(f"Network error while fetching articles: {str(e)}")
+        return []
+    except ValueError as e:
+        st.error(f"Error parsing API response: {str(e)}")
+        return []
     except Exception as e:
-        st.error(f"Error fetching articles: {str(e)}")
+        st.error(f"Unexpected error fetching articles: {str(e)}")
         return []
 
 def fetch_full_article(url):
