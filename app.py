@@ -12,12 +12,19 @@ st.set_page_config(layout="wide", page_title="News Bias AI")
 
 # Initialize APIs
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # Try to get API keys from environment variables first, then fall back to secrets.toml
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
+    NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
+    
+    if not GEMINI_API_KEY or not NEWS_API_KEY:
+        raise ValueError("API keys not found in environment variables or secrets.toml")
+        
+    genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
-    NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
     NEWS_API_URL = "https://newsapi.org/v2/everything"
 except Exception as e:
-    st.error("Error initializing APIs. Please check your API keys.")
+    st.error(f"Error initializing APIs: {str(e)}")
+    st.error("Please check your API keys in environment variables or secrets.toml")
     st.stop()
 
 # News sources mapping with domains
