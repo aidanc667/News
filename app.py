@@ -155,25 +155,47 @@ def get_recent_articles(source):
     }
     
     try:
+        # Log the request parameters (excluding the API key)
+        safe_params = {k: v for k, v in params.items() if k != 'apiKey'}
+        st.write(f"Making request to News API with parameters: {safe_params}")
+        
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
-        articles_data = response.json()
+        
+        # Log the response status and headers
+        st.write(f"Response status code: {response.status_code}")
+        st.write(f"Response headers: {dict(response.headers)}")
+        
+        # Check if response is valid JSON
+        try:
+            articles_data = response.json()
+        except ValueError as e:
+            st.error(f"Invalid JSON response from News API: {str(e)}")
+            st.write(f"Raw response content: {response.text[:500]}")  # Show first 500 chars of response
+            return []
         
         # If no articles found, try with a broader search
         if not articles_data.get('articles'):
+            st.write("No articles found with domain search, trying broader search...")
             params = {
                 'q': f'site:{source_domain}',
                 'language': 'en',
                 'apiKey': NEWS_API_KEY,
-                'pageSize': 10,  # Increased to get more articles
+                'pageSize': 10,
                 'sortBy': 'publishedAt'
             }
             response = requests.get(NEWS_API_URL, params=params, timeout=10)
-            articles_data = response.json()
+            try:
+                articles_data = response.json()
+            except ValueError as e:
+                st.error(f"Invalid JSON response from News API (broad search): {str(e)}")
+                st.write(f"Raw response content: {response.text[:500]}")
+                return []
         
         if response.status_code != 200:
-            st.error(f"NewsAPI Error: {articles_data.get('message', 'Unknown error')}")
-            if 'code' in articles_data:
-                st.error(f"Error Code: {articles_data['code']}")
+            error_msg = articles_data.get('message', 'Unknown error')
+            error_code = articles_data.get('code', 'No error code')
+            st.error(f"NewsAPI Error: {error_msg}")
+            st.error(f"Error Code: {error_code}")
             return []
             
         if not articles_data.get('articles'):
@@ -210,8 +232,11 @@ def get_recent_articles(source):
             return []
             
         return political_articles[:5]  # Ensure we return exactly 5 articles
+    except requests.exceptions.RequestException as e:
+        st.error(f"Network error while fetching articles: {str(e)}")
+        return []
     except Exception as e:
-        st.error(f"Error fetching articles: {str(e)}")
+        st.error(f"Unexpected error while fetching articles: {str(e)}")
         return []
 
 def fetch_full_article(url):
