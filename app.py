@@ -16,12 +16,32 @@ try:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
     NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
     
+    # Debug information for API keys
+    st.write("API Key Debug Information:")
+    st.write(f"GEMINI_API_KEY exists: {bool(GEMINI_API_KEY)}")
+    st.write(f"NEWS_API_KEY exists: {bool(NEWS_API_KEY)}")
+    if NEWS_API_KEY:
+        st.write(f"NEWS_API_KEY length: {len(NEWS_API_KEY)}")
+        st.write(f"NEWS_API_KEY first 4 chars: {NEWS_API_KEY[:4]}")
+    
     if not GEMINI_API_KEY or not NEWS_API_KEY:
         raise ValueError("API keys not found in environment variables or secrets.toml")
         
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
     NEWS_API_URL = "https://newsapi.org/v2/everything"
+    
+    # Test News API connection
+    test_params = {
+        'q': 'test',
+        'apiKey': NEWS_API_KEY,
+        'pageSize': 1
+    }
+    test_response = requests.get(NEWS_API_URL, params=test_params, timeout=10)
+    st.write(f"News API Test Response Status: {test_response.status_code}")
+    if test_response.status_code != 200:
+        st.write(f"News API Test Response: {test_response.text}")
+    
 except Exception as e:
     st.error(f"Error initializing APIs: {str(e)}")
     st.error("Please check your API keys in environment variables or secrets.toml")
