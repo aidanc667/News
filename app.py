@@ -6,6 +6,10 @@ import os
 from collections import defaultdict
 import time
 from bs4 import BeautifulSoup
+import concurrent.futures
+import asyncio
+import aiohttp
+from functools import lru_cache
 
 # Configuration
 st.set_page_config(layout="wide", page_title="News Bias AI")
@@ -16,31 +20,13 @@ try:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
     NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
     
-    # Debug information for API keys
-    st.write("API Key Debug Information:")
-    st.write(f"GEMINI_API_KEY exists: {bool(GEMINI_API_KEY)}")
-    st.write(f"NEWS_API_KEY exists: {bool(NEWS_API_KEY)}")
-    if NEWS_API_KEY:
-        st.write(f"NEWS_API_KEY length: {len(NEWS_API_KEY)}")
-        st.write(f"NEWS_API_KEY first 4 chars: {NEWS_API_KEY[:4]}")
-    
-    if not GEMINI_API_KEY or not NEWS_API_KEY:
-        raise ValueError("API keys not found in environment variables or secrets.toml")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not found in environment variables or secrets.toml")
+    if not NEWS_API_KEY:
+        raise ValueError("NEWS_API_KEY not found in environment variables or secrets.toml")
         
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
-    NEWS_API_URL = "https://newsapi.org/v2/everything"
-    
-    # Test News API connection
-    test_params = {
-        'q': 'test',
-        'apiKey': NEWS_API_KEY,
-        'pageSize': 1
-    }
-    test_response = requests.get(NEWS_API_URL, params=test_params, timeout=10)
-    st.write(f"News API Test Response Status: {test_response.status_code}")
-    if test_response.status_code != 200:
-        st.write(f"News API Test Response: {test_response.text}")
     
 except Exception as e:
     st.error(f"Error initializing APIs: {str(e)}")
@@ -49,10 +35,10 @@ except Exception as e:
 
 # News sources mapping with domains
 NEWS_SOURCES = {
-    "CNN": "cnn.com",
-    "Fox News": "foxnews.com",
-    "Politico": "politico.com",
-    "NBC News": "nbcnews.com"
+    "CNN (Liberal Bias)": "cnn.com",
+    "Fox News (Conservative Bias)": "foxnews.com",
+    "MSNBC (Liberal Bias)": "msnbc.com",
+    "The Daily Wire (Conservative Bias)": "dailywire.com"
 }
 
 # Custom CSS
@@ -152,106 +138,80 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def get_recent_articles(source):
-    """Get recent articles from a specific news source"""
-    today = datetime.now()
-    one_day_ago = today - timedelta(days=1)
-    
-    # Validate source
-    if source not in NEWS_SOURCES:
-        st.error(f"Invalid news source: {source}")
-        return []
-    
-    source_domain = NEWS_SOURCES[source]
-    
-    # First try with domain
-    params = {
-        'domains': source_domain,
-        'language': 'en',
-        'apiKey': NEWS_API_KEY,
-        'pageSize': 10,  # Increased to get more articles
-        'sortBy': 'publishedAt'
-    }
-    
+    """Get recent articles from a specific news source using News API"""
     try:
-        # Log the request parameters (excluding the API key)
-        safe_params = {k: v for k, v in params.items() if k != 'apiKey'}
-        st.write(f"Making request to News API with parameters: {safe_params}")
-        
-        response = requests.get(NEWS_API_URL, params=params, timeout=10)
-        
-        # Log the response status and headers
-        st.write(f"Response status code: {response.status_code}")
-        st.write(f"Response headers: {dict(response.headers)}")
-        
-        # Check if response is valid JSON
-        try:
-            articles_data = response.json()
-        except ValueError as e:
-            st.error(f"Invalid JSON response from News API: {str(e)}")
-            st.write(f"Raw response content: {response.text[:500]}")  # Show first 500 chars of response
+        # Validate source
+        if source not in NEWS_SOURCES:
+            st.error(f"Invalid news source: {source}")
             return []
         
-        # If no articles found, try with a broader search
-        if not articles_data.get('articles'):
-            st.write("No articles found with domain search, trying broader search...")
-            params = {
-                'q': f'site:{source_domain}',
-                'language': 'en',
-                'apiKey': NEWS_API_KEY,
-                'pageSize': 10,
-                'sortBy': 'publishedAt'
-            }
-            response = requests.get(NEWS_API_URL, params=params, timeout=10)
-            try:
-                articles_data = response.json()
-            except ValueError as e:
-                st.error(f"Invalid JSON response from News API (broad search): {str(e)}")
-                st.write(f"Raw response content: {response.text[:500]}")
-                return []
+        source_domain = NEWS_SOURCES[source]
+        
+        # News API URL
+        url = f"https://newsapi.org/v2/everything"
+        params = {
+            'domains': source_domain,
+            'language': 'en',
+            'sortBy': 'publishedAt',
+            'apiKey': NEWS_API_KEY,
+            'pageSize': 10  # Get more articles to filter from
+        }
+        
+        # Get the articles
+        response = requests.get(url, params=params, timeout=10)
         
         if response.status_code != 200:
-            error_msg = articles_data.get('message', 'Unknown error')
-            error_code = articles_data.get('code', 'No error code')
-            st.error(f"NewsAPI Error: {error_msg}")
-            st.error(f"Error Code: {error_code}")
+            st.error(f"Error from News API: {response.status_code}")
             return []
             
-        if not articles_data.get('articles'):
-            st.error(f"No articles found from {source}")
-            if 'status' in articles_data:
-                st.error(f"API Status: {articles_data['status']}")
-            if 'message' in articles_data:
-                st.error(f"API Message: {articles_data['message']}")
+        data = response.json()
+        
+        if data.get('status') != 'ok':
+            st.error(f"Invalid response from News API: {data.get('message', 'Unknown error')}")
             return []
             
-        # Filter articles to only include political content
-        political_articles = []
+        articles = []
         political_keywords = ['politics', 'government', 'congress', 'senate', 'white house', 'biden', 'trump', 'election', 'democrat', 'republican', 'campaign', 'vote', 'legislation', 'policy']
         
-        # Try to get 5 political articles
-        for article in articles_data['articles']:
-            title = article.get('title', '').lower()
-            description = article.get('description', '').lower()
-            if any(keyword in title or keyword in description for keyword in political_keywords):
-                political_articles.append(article)
-                if len(political_articles) >= 5:
-                    break
+        # Process articles
+        for article in data.get('articles', []):
+            try:
+                title = article.get('title', '')
+                description = article.get('description', '')
+                url = article.get('url', '')
+                
+                # Skip articles without required fields
+                if not all([title, url]):
+                    continue
+                
+                # Check if article is political
+                is_political = any(keyword in title.lower() or keyword in description.lower() for keyword in political_keywords)
+                
+                articles.append({
+                    'title': title,
+                    'url': url,
+                    'description': description,
+                    'is_political': is_political
+                })
+            except Exception:
+                continue
         
-        # If we don't have 5 political articles, add non-political articles to reach 5
+        # Filter for political articles first
+        political_articles = [article for article in articles if article['is_political']]
+        
+        # If we don't have enough political articles, add non-political ones
         if len(political_articles) < 5:
-            for article in articles_data['articles']:
-                if article not in political_articles:
-                    political_articles.append(article)
-                    if len(political_articles) >= 5:
-                        break
+            non_political = [article for article in articles if not article['is_political']]
+            political_articles.extend(non_political)
         
         if not political_articles:
             st.error(f"No articles found from {source}")
             return []
             
         return political_articles[:5]  # Ensure we return exactly 5 articles
+        
     except requests.exceptions.RequestException as e:
         st.error(f"Network error while fetching articles: {str(e)}")
         return []
@@ -259,31 +219,35 @@ def get_recent_articles(source):
         st.error(f"Unexpected error while fetching articles: {str(e)}")
         return []
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def fetch_full_article(url):
     """Fetch the full article content from the URL"""
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=5)  # Reduced timeout
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Remove unwanted elements
+            # Remove unwanted elements more efficiently
             for element in soup.find_all(['script', 'style', 'nav', 'footer', 'header']):
                 element.decompose()
             
-            # Get the main content
-            article_content = []
-            for paragraph in soup.find_all('p'):
-                text = paragraph.get_text().strip()
-                if text and len(text) > 50:  # Only include substantial paragraphs
-                    article_content.append(text)
+            # Get the main content more efficiently
+            article_content = ' '.join(
+                p.get_text().strip() for p in soup.find_all('p')
+                if len(p.get_text().strip()) > 50
+            )
             
-            return ' '.join(article_content)
+            return article_content
     except Exception as e:
         st.warning(f"Could not fetch full article: {str(e)}")
     return None
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def generate_article_summary(article_content):
     """Generate a concise summary of the article using Gemini"""
+    if not article_content:
+        return "Could not generate summary due to missing content."
+        
     prompt = f"""
     Summarize this article in 4-5 bullet points:
     1. Main topic
@@ -293,7 +257,7 @@ def generate_article_summary(article_content):
     5. Impact
     
     Article content:
-    {article_content[:8000]}
+    {article_content[:4000]}  # Reduced content length for faster processing
     
     Keep each point under 10 words. Be direct and clear.
     """
@@ -304,8 +268,12 @@ def generate_article_summary(article_content):
     except Exception as e:
         return "Could not generate summary due to an error."
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def analyze_bias(article_content, source):
     """Analyze the political bias in the article"""
+    if not article_content:
+        return "Could not analyze bias due to missing content."
+        
     prompt = f"""
     Analyze bias in this {source} article. For each aspect, provide specific examples:
     1. Word choice (loaded terms)
@@ -315,7 +283,7 @@ def analyze_bias(article_content, source):
     5. Conclusions (what's implied)
     
     Article content:
-    {article_content[:8000]}
+    {article_content[:4000]}  # Reduced content length for faster processing
     
     Keep each point under 8 words. Include specific examples.
     """
@@ -326,8 +294,12 @@ def analyze_bias(article_content, source):
     except Exception as e:
         return "Could not analyze bias due to an error."
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def generate_devils_advocate(article_content, source):
     """Generate a devil's advocate analysis of the article"""
+    if not article_content:
+        return "Could not generate devil's advocate analysis due to missing content."
+        
     prompt = f"""
     Critically analyze this {source} article:
     1. Missing context
@@ -337,7 +309,7 @@ def generate_devils_advocate(article_content, source):
     5. Unanswered questions
     
     Article content:
-    {article_content[:8000]}
+    {article_content[:4000]}  # Reduced content length for faster processing
     
     Keep each point under 8 words. Focus on gaps and alternatives.
     """
@@ -366,11 +338,13 @@ selected_source = st.selectbox(
 )
 
 if selected_source:
-    with st.spinner(f"Loading trending articles from {selected_source}..."):
+    # Extract the base source name without the bias label for processing
+    base_source = selected_source.split(" (")[0]
+    with st.spinner(f"Loading trending articles from {base_source}..."):
         articles = get_recent_articles(selected_source)
         
         if not articles:
-            st.error(f"Could not fetch trending articles from {selected_source}. Please try again later.")
+            st.error(f"Could not fetch trending articles from {base_source}. Please try again later.")
             st.stop()
         
         # Display each article with analysis
@@ -404,7 +378,7 @@ if selected_source:
                     with col2:
                         st.markdown('<div class="article-box bias-box">', unsafe_allow_html=True)
                         st.markdown("### Bias Analysis")
-                        bias_analysis = analyze_bias(article_content, selected_source)
+                        bias_analysis = analyze_bias(article_content, base_source)
                         st.markdown(bias_analysis)
                         st.markdown('</div>', unsafe_allow_html=True)
                     
@@ -412,7 +386,7 @@ if selected_source:
                     with col3:
                         st.markdown('<div class="article-box devil-box">', unsafe_allow_html=True)
                         st.markdown("### Devil's Advocate")
-                        devils_advocate = generate_devils_advocate(article_content, selected_source)
+                        devils_advocate = generate_devils_advocate(article_content, base_source)
                         st.markdown(devils_advocate)
                         st.markdown('</div>', unsafe_allow_html=True)
 
