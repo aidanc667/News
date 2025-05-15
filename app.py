@@ -156,14 +156,18 @@ def get_recent_articles(source):
             'language': 'en',
             'sortBy': 'publishedAt',
             'apiKey': NEWS_API_KEY,
-            'pageSize': 10  # Get more articles to filter from
+            'pageSize': 10,  # Get more articles to filter from
+            'q': 'politics OR government OR election'  # Add search query to improve results
         }
         
         # Get the articles
         response = requests.get(url, params=params, timeout=10)
         
         if response.status_code != 200:
-            st.error(f"Error from News API: {response.status_code}")
+            error_message = response.json().get('message', 'Unknown error')
+            st.error(f"Error from News API: {response.status_code} - {error_message}")
+            if response.status_code == 403:
+                st.error("This might be due to an invalid API key or the API key not being properly configured.")
             return []
             
         data = response.json()
