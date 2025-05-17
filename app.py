@@ -160,29 +160,17 @@ def get_recent_articles(source):
             'q': 'politics OR government OR election'  # Add search query to improve results
         }
         
-        # Get the articles with increased timeout and headers
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, params=params, headers=headers, timeout=15)
-        
-        # Log the response for debugging
-        st.write(f"Response status code: {response.status_code}")
-        st.write(f"Response headers: {response.headers}")
+        # Get the articles
+        response = requests.get(url, params=params, timeout=10)
         
         if response.status_code != 200:
-            error_message = response.json().get('message', 'Unknown error') if response.text else 'Empty response'
+            error_message = response.json().get('message', 'Unknown error')
             st.error(f"Error from News API: {response.status_code} - {error_message}")
             if response.status_code == 403:
                 st.error("This might be due to an invalid API key or the API key not being properly configured.")
             return []
             
-        try:
-            data = response.json()
-        except ValueError as e:
-            st.error(f"Invalid JSON response: {str(e)}")
-            st.error(f"Response content: {response.text[:200]}...")  # Show first 200 chars of response
-            return []
+        data = response.json()
         
         if data.get('status') != 'ok':
             st.error(f"Invalid response from News API: {data.get('message', 'Unknown error')}")
@@ -211,8 +199,7 @@ def get_recent_articles(source):
                     'description': description,
                     'is_political': is_political
                 })
-            except Exception as e:
-                st.warning(f"Error processing article: {str(e)}")
+            except Exception:
                 continue
         
         # Filter for political articles first
