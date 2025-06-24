@@ -26,7 +26,7 @@ try:
         raise ValueError("NEWS_API_KEY not found in environment variables or secrets.toml")
         
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
     
 except Exception as e:
     st.error(f"Error initializing APIs: {str(e)}")
