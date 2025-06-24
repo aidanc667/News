@@ -253,7 +253,7 @@ def generate_article_summary(article_content):
         return "Could not generate summary due to missing content."
         
     prompt = f"""
-    Summarize this article in 4-5 bullet points:
+    Provide a direct summary of this article in 4-5 bullet points:
     1. Main topic
     2. Key facts
     3. Main arguments
@@ -261,9 +261,9 @@ def generate_article_summary(article_content):
     5. Impact
     
     Article content:
-    {article_content[:4000]}  # Reduced content length for faster processing
+    {article_content[:4000]}
     
-    Keep each point under 10 words. Be direct and clear.
+    Keep each point under 10 words. Be direct and clear. Do not include introductory phrases like "Here's a summary" or "Okay, here's".
     """
     
     try:
@@ -279,17 +279,17 @@ def analyze_bias(article_content, source):
         return "Could not analyze bias due to missing content."
         
     prompt = f"""
-    Analyze bias in this {source} article. For each aspect, provide specific examples:
-    1. Word choice (loaded terms)
-    2. Fact selection (inclusions/exclusions)
-    3. Tone (how presented)
-    4. Sources (who's quoted)
-    5. Conclusions (what's implied)
+    Analyze bias in this {source} article. Provide one summary sentence for each aspect:
+    1. Word choice:
+    2. Fact selection:
+    3. Tone:
+    4. Sources:
+    5. Conclusions:
     
     Article content:
-    {article_content[:4000]}  # Reduced content length for faster processing
+    {article_content[:4000]}
     
-    Keep each point under 8 words. Include specific examples.
+    Provide exactly one summary sentence per section (no bullet points). Summarize all findings into one concise description. Keep each sentence under 8 words. Do not include introductory phrases like "Here's an analysis" or "Okay, here's". Do not include parenthetical labels like (loaded terms) or (inclusions/exclusions) in your response.
     """
     
     try:
@@ -305,7 +305,7 @@ def generate_devils_advocate(article_content, source):
         return "Could not generate devil's advocate analysis due to missing content."
         
     prompt = f"""
-    Critically analyze this {source} article:
+    Provide a critical analysis of this {source} article:
     1. Missing context
     2. Opposing views
     3. Questionable assumptions
@@ -313,9 +313,9 @@ def generate_devils_advocate(article_content, source):
     5. Unanswered questions
     
     Article content:
-    {article_content[:4000]}  # Reduced content length for faster processing
+    {article_content[:4000]}
     
-    Keep each point under 8 words. Focus on gaps and alternatives.
+    Keep each point under 8 words. Focus on gaps and alternatives. Do not include introductory phrases like "Here's a critical analysis" or "Okay, here's".
     """
     
     try:
