@@ -26,7 +26,7 @@ try:
         raise ValueError("NEWS_API_KEY not found in environment variables or secrets.toml")
         
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
 except Exception as e:
     st.error(f"Error initializing APIs: {str(e)}")
@@ -279,17 +279,17 @@ def analyze_bias(article_content, source):
         return "Could not analyze bias due to missing content."
         
     prompt = f"""
-    Analyze bias in this {source} article. Provide one summary sentence for each aspect:
-    1. Word choice:
-    2. Fact selection:
-    3. Tone:
-    4. Sources:
-    5. Conclusions:
+    Analyze bias in this {source} article. For each aspect, provide specific examples:
+    1. Word choice (loaded terms)
+    2. Fact selection (inclusions/exclusions)
+    3. Tone (how presented)
+    4. Sources (who's quoted)
+    5. Conclusions (what's implied)
     
     Article content:
-    {article_content[:4000]}
+    {article_content[:4000]}  # Reduced content length for faster processing
     
-    Provide exactly one summary sentence per section (no bullet points). Summarize all findings into one concise description. Keep each sentence under 8 words. Do not include introductory phrases like "Here's an analysis" or "Okay, here's". Do not include parenthetical labels like (loaded terms) or (inclusions/exclusions) in your response.
+    Keep each point under 8 words. Include specific examples.
     """
     
     try:
@@ -315,7 +315,7 @@ def generate_devils_advocate(article_content, source):
     Article content:
     {article_content[:4000]}
     
-    Keep each point under 8 words. Focus on gaps and alternatives. Do not include introductory phrases like "Here's a critical analysis" or "Okay, here's".
+    Keep each point under 8 words. Focus on gaps and alternatives. Do not include any introductory headers like "Here is a critical analysis" or "Here is a bias analysis". Do not include parenthetical labels in your response.
     """
     
     try:
