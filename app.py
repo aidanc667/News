@@ -26,7 +26,7 @@ try:
         raise ValueError("NEWS_API_KEY not found in environment variables or secrets.toml")
         
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
     
 except Exception as e:
     st.error(f"Error initializing APIs: {str(e)}")
@@ -137,6 +137,33 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Rate limiting and quota tracking
+last_api_call = 0
+MIN_CALL_INTERVAL = 1.0  # Minimum 1 second between API calls
+daily_request_count = 0
+MAX_DAILY_REQUESTS = 45  # Leave some buffer below the 50 limit
+
+def rate_limited_api_call():
+    """Ensure minimum time between API calls and track quota"""
+    global last_api_call, daily_request_count
+    
+    # Check quota first
+    if daily_request_count >= MAX_DAILY_REQUESTS:
+        st.error(f"⚠️ Daily API quota limit reached ({daily_request_count}/{MAX_DAILY_REQUESTS}). Please wait until tomorrow or upgrade your plan.")
+        return False
+    
+    current_time = time.time()
+    time_since_last = current_time - last_api_call
+    
+    if time_since_last < MIN_CALL_INTERVAL:
+        sleep_time = MIN_CALL_INTERVAL - time_since_last
+        time.sleep(sleep_time)
+    
+    last_api_call = time.time()
+    daily_request_count += 1
+    
+    return True
 
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
 def get_recent_articles(source):
@@ -251,78 +278,88 @@ def generate_article_summary(article_content):
     """Generate a concise summary of the article using Gemini"""
     if not article_content:
         return "Could not generate summary due to missing content."
-        
-    prompt = f"""
-    Provide a direct summary of this article in 4-5 bullet points:
-    1. Main topic
-    2. Key facts
-    3. Main arguments
-    4. Key quotes
-    5. Impact
-    
-    Article content:
-    {article_content[:4000]}
-    
-    Keep each point under 10 words. Be direct and clear. Do not include introductory phrases like "Here's a summary" or "Okay, here's".
-    """
     
     try:
+        # Rate limiting
+        if not rate_limited_api_call():
+            return "Rate limit reached. Please try again later."
+        
+        prompt = f"""
+        Provide a concise summary of this article in exactly 5 bullet points that capture the main content:
+        
+        Article content:
+        {article_content[:4000]}
+        
+        Create 5 bullet points that directly summarize the key information from this specific article. Focus on the actual content, events, people, and facts mentioned. Keep each bullet point concise but informative (8-12 words). Do not include introductory phrases like "Here's a summary" or "Okay, here's". Start directly with the bullet points.
+        """
+        
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        return "Could not generate summary due to an error."
+        st.error(f"❌ Summary generation failed: {str(e)}")
+        return f"Could not generate summary due to an error: {str(e)}"
 
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
 def analyze_bias(article_content, source):
     """Analyze the political bias in the article"""
     if not article_content:
         return "Could not analyze bias due to missing content."
-        
-    prompt = f"""
-    Analyze bias in this {source} article. For each aspect, provide specific examples:
-    1. Word choice (loaded terms)
-    2. Fact selection (inclusions/exclusions)
-    3. Tone (how presented)
-    4. Sources (who's quoted)
-    5. Conclusions (what's implied)
-    
-    Article content:
-    {article_content[:4000]}  # Reduced content length for faster processing
-    
-    Keep each point under 8 words. Include specific examples.
-    """
     
     try:
+        # Rate limiting
+        if not rate_limited_api_call():
+            return "Rate limit reached. Please try again later."
+        
+        prompt = f"""
+        Analyze bias in this {source} article. Provide concise analysis for each aspect:
+        • Word choice and loaded language
+        • Fact selection and omissions
+        • Tone and presentation style
+        • Sources and credibility
+        • Conclusions and implications
+        
+        Article content:
+        {article_content[:4000]}  # Reduced content length for faster processing
+        
+        Keep each bullet point concise but informative. Use 8-12 words per point with specific examples from the article. Do not include introductory phrases like "Here's a bias analysis" or "Okay, here's". Start directly with the bullet points.
+        """
+        
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        return "Could not analyze bias due to an error."
+        st.error(f"❌ Bias analysis failed: {str(e)}")
+        return f"Could not analyze bias due to an error: {str(e)}"
 
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
 def generate_devils_advocate(article_content, source):
     """Generate a devil's advocate analysis of the article"""
     if not article_content:
         return "Could not generate devil's advocate analysis due to missing content."
-        
-    prompt = f"""
-    Provide a critical analysis of this {source} article:
-    1. Missing context
-    2. Opposing views
-    3. Questionable assumptions
-    4. Alternative interpretations
-    5. Unanswered questions
-    
-    Article content:
-    {article_content[:4000]}
-    
-    Keep each point under 8 words. Focus on gaps and alternatives. Do not include any introductory headers like "Here is a critical analysis" or "Here is a bias analysis". Do not include parenthetical labels in your response.
-    """
     
     try:
+        # Rate limiting
+        if not rate_limited_api_call():
+            return "Rate limit reached. Please try again later."
+        
+        prompt = f"""
+        Provide a critical analysis of this {source} article. Address exactly 5 aspects:
+        • Missing context and background info
+        • Opposing viewpoints not presented
+        • Questionable assumptions and claims
+        • Alternative interpretations of events
+        • Unanswered questions and gaps
+        
+        Article content:
+        {article_content[:4000]}
+        
+        Keep each bullet point concise but informative. Use 8-12 words per point with specific examples from the article. Do not include introductory headers like "Here is a critical analysis" or "Here is a bias analysis". Do not include parenthetical labels in your response. Start directly with the bullet points.
+        """
+        
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        return "Could not generate devil's advocate analysis due to an error."
+        st.error(f"❌ Devil's advocate generation failed: {str(e)}")
+        return f"Could not generate devil's advocate analysis due to an error: {str(e)}"
 
 # Header
 today = datetime.now().strftime("%A, %B %d, %Y")
